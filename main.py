@@ -5,6 +5,30 @@ import json
 from bs4 import BeautifulSoup as bs
 
 class Pytdl:
+  def __init__(self):
+    self.__nowData = {}
+    self.__prevData = {}
+    self.__noNeed = [
+      "_ydl_info",
+      "_ydl_opts",
+      "version",
+      "callback",
+      "_have_basic",
+      "_have_gdata",
+      "_username",
+      "_streams",
+      "_oggstreams",
+      "_m4astreams",
+      "_allstreams",
+      "_videostreams",
+      "_keywords",
+      "_bigthumb",
+      "_bigthumbhd",
+      "_mix_pl",
+      "expiry"
+    ]
+    pafy.set_api_key("AIzaSyBxmDSkfH8mSQCGKe1PiKaOdohHI0BeLDg")
+
   def setup(self):
     pafy.set_api_key("AIzaSyBxmDSkfH8mSQCGKe1PiKaOdohHI0BeLDg")
 

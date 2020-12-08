@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "pytdl"
-version = "0.1.0"
+version = "0.1.2"
 description = ""
-authors = ["Your Name <you@example.com>"]
+authors = ["bloodnight <rexwu9204@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.6"
 pafy = "^0.5.5"
 youtube_dl="^2020.11.12"
 bs4="^0.0.1"

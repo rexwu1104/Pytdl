@@ -5,14 +5,14 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
   name='Pytdl',
-  version='0.2.0',
+  version='0.1.2',
   scripts=['Pytdl'] ,
   author="Black Lotus",
   author_email="rexwu1104@gmail.com",
   description="a new youtube_dl",
   long_description=long_description,
   long_description_content_type="text/markdown",
-  url="None",
+  url="https://github.com/rexwu1104/Pytdl",
   packages=setuptools.find_packages(),
   classifiers=[
     "Programming Language :: Python :: 3.6",
