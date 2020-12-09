@@ -4,9 +4,8 @@ with open("README.md", "r") as fh:
   long_description=fh.read()
 
 setuptools.setup(
-  name='Pytdl',
+  name='NPytdl',
   version='0.1.2',
-  scripts=['Pytdl'] ,
   author="bloodnight",
   author_email="rexwu9204@gmail.com",
   description="a new youtube_dl",

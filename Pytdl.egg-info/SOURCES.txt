@@ -1,9 +1,0 @@
-Pytdl
-README.md
-pyproject.toml
-setup.py
-Pytdl.egg-info/PKG-INFO
-Pytdl.egg-info/SOURCES.txt
-Pytdl.egg-info/dependency_links.txt
-Pytdl.egg-info/requires.txt
-Pytdl.egg-info/top_level.txt

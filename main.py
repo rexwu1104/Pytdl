@@ -1,8 +1,11 @@
+import os
 import pafy
+import time
 from aiohttp import ClientSession
 import urllib as u
 import json
 from bs4 import BeautifulSoup as bs
+import asyncio
 
 class Pytdl:
   def __init__(self):
@@ -171,7 +174,9 @@ class Pytdl:
   async def getAudioList(self, url : str):
     if url.find("list=") == -1:
       raise RuntimeError("This isn't a list")
+    start = time.time()
     data_list = await self.__getList(url)
+    print(time.time() - start)
     audio_list = {}
     for Pafy in data_list["items"]:
       audio = await self.__datatry(Pafy["pafy"].getbestaudio)
@@ -205,3 +210,80 @@ class Pytdl:
   
   def download(self, stream, path : str):
     stream.download(filepath=path, quiet=True)
+
+ydl = Pytdl()
+loop = asyncio.get_event_loop()
+
+print("歡迎使用Pytdl。")
+# os.system("python")
+
+while True:
+  print("請問你要下載什麼歌曲呢?")
+  print("請輸入網址或是你想搜尋的影片名稱。")
+  name = input()
+  os.system("clear")
+  if name.find("https://") == -1:
+    print("看來這不是個網址呢")
+    print("沒關係，我幫你搜尋")
+    songs = loop.run_until_complete(ydl.songList(12, name))
+    for i in range(1, len(songs)+1):
+      print(str(i)+".", songs[i-1]["title"])
+    print("請問是哪一首呢 (請輸入數字)")
+    num=int(input())
+    while num > len(songs) or num < 1:
+      os.system("clear")
+      print("不好意思，這不再範圍內呢")
+      print("請問是哪一首呢 (請輸入數字)")
+      num=int(input())
+    os.system("clear")
+    name = "https://youtu.be/" + songs[num-1]["id"]
+  else:
+    print("好的，幫你搜尋")
+  print("那你要什麼類型?")
+  print("有 audio, video 和 normal")
+  t=input()
+  os.system("clear")
+  while t not in ["audio", "video", "normal"]:
+    print("沒有這個類型耶")
+    print("我們有 audio, video 和 normal")
+    t=input()
+  if name.find("list=") != -1:
+    if t == "audio":
+      songs = loop.run_until_complete(ydl.getAudioList(name))
+      for i in songs:
+        audio = loop.run_until_complete(ydl.getAudio("https://youtu.be/" + i))
+        ydl.download(audio["stream"], f'{audio["title"]}.mp3')
+    elif t == "video":
+      pass
+    elif t == "normal":
+      pass
+  else:
+    if t == "audio":
+      print("OK. 幫你下載音訊")
+      audio = loop.run_until_complete(ydl.getAudio(name))
+      ydl.download(audio["stream"], f'{audio["title"]}.mp3')
+      if os.path.isfile(f'{audio["title"]}.mp3') == True:
+        print("下載完成")
+      else:
+        print("下載失敗")
+    elif t == "video":
+      print("OK. 幫你下載影片")
+      video = loop.run_until_complete(ydl.getVideo(name))
+      ydl.download(video["stream"], f'{video["title"]}.mp4')
+      if os.path.isfile(f'{video["title"]}.mp4') == True:
+        print("下載完成")
+      else:
+        print("下載失敗")
+    elif t == "normal":
+      print("OK. 幫你下載影片及音訊")
+      video = loop.run_until_complete(ydl.getAll(name))
+      ydl.download(video["stream"], f'{video["title"]}.mp4')
+      if os.path.isfile(f'{video["title"]}.mp4') == True:
+        print("下載完成")
+      else:
+        print("下載失敗")
+  print("請問你還要下載嗎? (Y/N)")
+  ans=input()
+  if ans == "N" or ans == "n":
+    break
+  os.system("clear")

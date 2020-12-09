@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+setup.py
+NPytdl/__init__.py
+NPytdl.egg-info/PKG-INFO
+NPytdl.egg-info/SOURCES.txt
+NPytdl.egg-info/dependency_links.txt
+NPytdl.egg-info/requires.txt
+NPytdl.egg-info/top_level.txt
