@@ -6,7 +6,6 @@ with open("README.md", "r") as fh:
 setuptools.setup(
   name='Pytdl',
   version='0.1.2',
-  scripts=['Pytdl'] ,
   author="bloodnight",
   author_email="rexwu9204@gmail.com",
   description="a new youtube_dl",
