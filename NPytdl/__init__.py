@@ -202,6 +202,28 @@ class Pytdl:
       del video_list[Pafy["pafy"].videoid]["watchv_url"]
       del video_list[Pafy["pafy"].videoid]["videoid"]
     return video_list
+
+  async def getAllList(self, url : str):
+    if url.find("list=") == -1:
+      raise RuntimeError("This isn't a list")
+    data_list = await self.__getList(url)
+    video_list = {}
+    for Pafy in data_list["items"]:
+      audio = await self.__datatry(Pafy["pafy"].getbest)
+      video_list[Pafy["pafy"].videoid] = {
+        "stream": audio,
+        "url": {
+          "vurl": Pafy["pafy"].watchv_url,
+          "aurl": audio.url_https
+        },
+        "id": Pafy["pafy"].videoid,
+        "title": Pafy["pafy"].title
+      }
+      await self.__getPafy(Pafy["pafy"].watchv_url)
+      video_list[Pafy["pafy"].videoid] = {**video_list[Pafy["pafy"].videoid], **self.__nowData}
+      del video_list[Pafy["pafy"].videoid]["watchv_url"]
+      del video_list[Pafy["pafy"].videoid]["videoid"]
+    return video_list
   
   def download(self, stream, path : str):
     stream.download(filepath=path, quiet=True)

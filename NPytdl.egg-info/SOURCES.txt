@@ -1,5 +1,4 @@
 README.md
-pyproject.toml
 setup.py
 NPytdl/__init__.py
 NPytdl.egg-info/PKG-INFO

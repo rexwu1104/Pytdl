@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
   name='NPytdl',
-  version='0.1.2',
+  version='0.1.3',
   author="bloodnight",
   author_email="rexwu9204@gmail.com",
   description="a new youtube_dl",
@@ -25,6 +25,6 @@ setuptools.setup(
     'youtube_dl>=2020.11.12',
     'pafy>=0.5.5',
     'bs4>=0.0.1',
-    'aiohttp>=3.7.2'
+    'aiohttp>=3.6.0'
   ],
 )
