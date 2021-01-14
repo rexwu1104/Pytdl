@@ -1,6 +1,6 @@
 import os
+os.system("pip install youtube_dl\npip install pafy\npip install bs4")
 import pafy
-import time
 from aiohttp import ClientSession
 import urllib as u
 import json
@@ -171,13 +171,13 @@ class Pytdl:
   async def __getList(self, url : str):
     return await self.__datatry(pafy.get_playlist, url)
 
-  async def getAudioList(self, url : str):
+  async def getAudioList(self, url : str, stream : bool = True):
     if url.find("list=") == -1:
       raise RuntimeError("This isn't a list")
     data_list = await self.__getList(url)
     audio_list = {}
     for Pafy in data_list["items"]:
-      audio = await self.__datatry(Pafy["pafy"].getbestaudio)
+      audio = await self.__datatry(Pafy["pafy"].getbestaudio) if stream else None
       audio_list[Pafy["pafy"].videoid] = {
         "stream": audio,
         "url": audio.url_https,
@@ -187,32 +187,31 @@ class Pytdl:
       }
     return audio_list
 
-  async def getVideoList(self, url : str):
+  async def getVideoList(self, url : str, stream : bool = True):
     if url.find("list=") == -1:
       raise RuntimeError("This isn't a list")
     data_list = await self.__getList(url)
     video_list = {}
     for Pafy in data_list["items"]:
-      video = await self.__datatry(Pafy["pafy"].getbestvideo)
+      video = await self.__datatry(Pafy["pafy"].getbestvideo) if stream else None
       video_list[Pafy["pafy"].videoid] = {
         "stream": video,
         "url": Pafy["pafy"].watchv_url,
         "id": Pafy["pafy"].videoid,
         "title": Pafy["pafy"].title
       }
-      await self.__getPafy(Pafy["pafy"].watchv_url)
       video_list[Pafy["pafy"].videoid] = {**video_list[Pafy["pafy"].videoid], **self.__nowData}
       del video_list[Pafy["pafy"].videoid]["watchv_url"]
       del video_list[Pafy["pafy"].videoid]["videoid"]
     return video_list
 
-  async def getAllList(self, url : str):
+  async def getAllList(self, url : str, stream : bool = True):
     if url.find("list=") == -1:
       raise RuntimeError("This isn't a list")
     data_list = await self.__getList(url)
     video_list = {}
     for Pafy in data_list["items"]:
-      audio = await self.__datatry(Pafy["pafy"].getbest)
+      audio = await self.__datatry(Pafy["pafy"].getbest) if stream else None
       video_list[Pafy["pafy"].videoid] = {
         "stream": audio,
         "url": {
@@ -222,7 +221,6 @@ class Pytdl:
         "id": Pafy["pafy"].videoid,
         "title": Pafy["pafy"].title
       }
-      await self.__getPafy(Pafy["pafy"].watchv_url)
       video_list[Pafy["pafy"].videoid] = {**video_list[Pafy["pafy"].videoid], **self.__nowData}
       del video_list[Pafy["pafy"].videoid]["watchv_url"]
       del video_list[Pafy["pafy"].videoid]["videoid"]
@@ -281,8 +279,8 @@ while True:
     if t == "audio":
       print("OK. 幫你下載音訊")
       audio = loop.run_until_complete(ydl.getAudio(name))
-      ydl.download(audio["stream"], f'{audio["title"]}.mp3')
-      if os.path.isfile(f'{audio["title"]}.mp3') == True:
+      ydl.download(audio["stream"], f'{audio["title"]}.wav')
+      if os.path.isfile(f'{audio["title"]}.wav') == True:
         print("下載完成")
       else:
         print("下載失敗")

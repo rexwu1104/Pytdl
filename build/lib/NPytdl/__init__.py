@@ -98,7 +98,7 @@ class Pytdl:
     if url.find("list=") != -1:
       raise RuntimeError("This isn't a snog.")
     if url.find("https://") == -1:
-      url = await self.__search(url)[0]["id"]
+      url = (await self.__search(url))[0]["id"]
     a=True
     while a:
       try:
