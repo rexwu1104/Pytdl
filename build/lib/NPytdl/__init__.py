@@ -197,7 +197,6 @@ class Pytdl:
         "id": Pafy["pafy"].videoid,
         "title": Pafy["pafy"].title
       }
-      await self.__getPafy(Pafy["pafy"].watchv_url)
       video_list[Pafy["pafy"].videoid] = {**video_list[Pafy["pafy"].videoid], **self.__nowData}
       del video_list[Pafy["pafy"].videoid]["watchv_url"]
       del video_list[Pafy["pafy"].videoid]["videoid"]
@@ -219,7 +218,6 @@ class Pytdl:
         "id": Pafy["pafy"].videoid,
         "title": Pafy["pafy"].title
       }
-      await self.__getPafy(Pafy["pafy"].watchv_url)
       video_list[Pafy["pafy"].videoid] = {**video_list[Pafy["pafy"].videoid], **self.__nowData}
       del video_list[Pafy["pafy"].videoid]["watchv_url"]
       del video_list[Pafy["pafy"].videoid]["videoid"]
