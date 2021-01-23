@@ -1,0 +1,1 @@
+run="python3 -m twine upload dist/*\npython3 setup.py sdist bdist_wheel"

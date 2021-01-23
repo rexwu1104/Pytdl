@@ -1,8 +1,9 @@
+import os
 import pafy
-from aiohttp import ClientSession
-import urllib as u
 import json
-from bs4 import BeautifulSoup as bs
+import asyncio
+import subprocess
+import urllib3 as u
 
 class Pytdl:
   def __init__(self):
@@ -32,34 +33,26 @@ class Pytdl:
   def setup(self):
     pafy.set_api_key("AIzaSyBxmDSkfH8mSQCGKe1PiKaOdohHI0BeLDg")
 
-  async def __fetch(self, link : str, session : ClientSession):
-    async with session.get(link) as response:
-      html_body = await response.text()
-      return html_body
-
   async def __datatry(self, ex, *args):
     a=True
+    times = 0
     while a:
+      if times == 3:
+        raise Exception("Can't get this data.")
       try:
+        data = await ex(*args)
+        a = False
+      except TypeError:
         data = ex(*args)
-        a=False
+        a = False
       except:
+        times += 1
         continue
     return data
   
   async def __search(self, content : str):
-    async with ClientSession() as session:
-      response = await self.__fetch(f'https://www.youtube.com/results?search_query={u.parse.quote(content).replace("%20", "+")}', session)
-    scripts = bs(response, "html.parser").find_all("script")
-    for js in scripts:
-      if len(str(js)) > 100000:
-        script = str(js)
-    obj = json.loads(script.replace(script[:script.find("var")], "").strip(";\n// scraper_data_end\n</script>").strip("var ytInitialData = "))
-    content = obj["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"]["contents"]
-    if "itemSectionRenderer" in content[0]:
-      data = content[0]["itemSectionRenderer"]["contents"]
-    else:
-      data = content[1]["itemSectionRenderer"]["contents"]
+    data = subprocess.check_output(f'./search https://www.youtube.com/results?search_query={u.parse.quote(content).replace("%20", "+")}', shell=True).decode("utf-8")
+    data = json.loads(data)
     result = []
     for i in data:
       if "videoRenderer" in i:
@@ -69,9 +62,20 @@ class Pytdl:
           "thumbnail": i["videoRenderer"]["thumbnail"]["thumbnails"][0]["url"],
           "length": "0:00"
         })
+        print(result[-1]["title"])
         if "lengthText" in i["videoRenderer"]:
           result[-1]["length"] = i["videoRenderer"]["lengthText"]["simpleText"]
     return result
+
+  async def searchList(self, list_id : str):
+    data = subprocess.check_output(f'./search https://www.youtube.com/playlist?list={list_id} list', shell=True).decode("utf-8")
+    data = json.loads(data)
+    result = []
+    for i in data:
+      if "playlistVideoRenderer" in i:
+        if "videoId" in i["playlistVideoRenderer"]:
+          result.append(f'https://youtu.be/{i["playlistVideoRenderer"]["videoId"]}')
+    return result    
 
   async def __getPafy(self, url : str):
     self.__nowData = {}
@@ -98,7 +102,7 @@ class Pytdl:
     if url.find("list=") != -1:
       raise RuntimeError("This isn't a snog.")
     if url.find("https://") == -1:
-      url = (await self.__search(url))[0]["id"]
+      url = await self.__search(url)[0]["id"]
     a=True
     while a:
       try:
@@ -166,61 +170,36 @@ class Pytdl:
     return audio_data
 
   async def __getList(self, url : str):
-    return await self.__datatry(pafy.get_playlist, url)
+    return await self.__datatry(self.searchList, url)
 
-  async def getAudioList(self, url : str):
+  async def getAudioList(self, url : str, stream : bool = True):
     if url.find("list=") == -1:
       raise RuntimeError("This isn't a list")
-    data_list = await self.__getList(url)
+    data_list = await self.__getList(url.split("list=")[1])
     audio_list = {}
-    for Pafy in data_list["items"]:
-      audio = await self.__datatry(Pafy["pafy"].getbestaudio)
-      audio_list[Pafy["pafy"].videoid] = {
-        "stream": audio,
-        "url": audio.url_https,
-        "id": Pafy["pafy"].videoid,
-        "title": Pafy["pafy"].title,
-        "length": Pafy["pafy"].length
-      }
+    for i in data_list:
+      Pafy = await self.getAudio(i)
+      audio_list[Pafy["id"]] = Pafy
     return audio_list
 
-  async def getVideoList(self, url : str):
+  async def getVideoList(self, url : str, stream : bool = True):
     if url.find("list=") == -1:
       raise RuntimeError("This isn't a list")
-    data_list = await self.__getList(url)
+    data_list = await self.__getList(url.split("list=")[1])
     video_list = {}
-    for Pafy in data_list["items"]:
-      video = await self.__datatry(Pafy["pafy"].getbestvideo)
-      video_list[Pafy["pafy"].videoid] = {
-        "stream": video,
-        "url": Pafy["pafy"].watchv_url,
-        "id": Pafy["pafy"].videoid,
-        "title": Pafy["pafy"].title
-      }
-      video_list[Pafy["pafy"].videoid] = {**video_list[Pafy["pafy"].videoid], **self.__nowData}
-      del video_list[Pafy["pafy"].videoid]["watchv_url"]
-      del video_list[Pafy["pafy"].videoid]["videoid"]
+    for i in data_list:
+      Pafy = await self.getVideo(i)
+      video_list[Pafy["id"]] = Pafy
     return video_list
 
-  async def getAllList(self, url : str):
+  async def getAllList(self, url : str, stream : bool = True):
     if url.find("list=") == -1:
       raise RuntimeError("This isn't a list")
-    data_list = await self.__getList(url)
+    data_list = await self.__getList(url.split("list=")[1])
     video_list = {}
-    for Pafy in data_list["items"]:
-      audio = await self.__datatry(Pafy["pafy"].getbest)
-      video_list[Pafy["pafy"].videoid] = {
-        "stream": audio,
-        "url": {
-          "vurl": Pafy["pafy"].watchv_url,
-          "aurl": audio.url_https
-        },
-        "id": Pafy["pafy"].videoid,
-        "title": Pafy["pafy"].title
-      }
-      video_list[Pafy["pafy"].videoid] = {**video_list[Pafy["pafy"].videoid], **self.__nowData}
-      del video_list[Pafy["pafy"].videoid]["watchv_url"]
-      del video_list[Pafy["pafy"].videoid]["videoid"]
+    for i in data_list:
+      Pafy = await self.getAll(i)
+      video_list[Pafy["id"]] = Pafy
     return video_list
   
   def download(self, stream, path : str):

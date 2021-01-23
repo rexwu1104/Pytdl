@@ -1,8 +1,9 @@
+import os
 import pafy
-from aiohttp import ClientSession
-import urllib as u
 import json
-from bs4 import BeautifulSoup as bs
+import asyncio
+import subprocess
+import urllib3 as u
 
 class Pytdl:
   def __init__(self):
@@ -32,14 +33,12 @@ class Pytdl:
   def setup(self):
     pafy.set_api_key("AIzaSyBxmDSkfH8mSQCGKe1PiKaOdohHI0BeLDg")
 
-  async def __fetch(self, link : str, session : ClientSession):
-    async with session.get(link) as response:
-      html_body = await response.text()
-      return html_body
-
   async def __datatry(self, ex, *args):
     a=True
+    times = 0
     while a:
+      if times == 3:
+        raise Exception("Can't get this data.")
       try:
         data = await ex(*args)
         a = False
@@ -47,22 +46,13 @@ class Pytdl:
         data = ex(*args)
         a = False
       except:
+        times += 1
         continue
     return data
   
   async def __search(self, content : str):
-    async with ClientSession() as session:
-      response = await self.__fetch(f'https://www.youtube.com/results?search_query={u.parse.quote(content).replace("%20", "+")}', session)
-    scripts = bs(response, "html.parser").find_all("script")
-    for js in scripts:
-      if len(str(js)) > 100000:
-        script = str(js)
-    obj = json.loads(script.replace(script[:script.find("var")], "").strip(";\n// scraper_data_end\n</script>").strip("var ytInitialData = "))
-    content = obj["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"]["contents"]
-    if "itemSectionRenderer" in content[0]:
-      data = content[0]["itemSectionRenderer"]["contents"]
-    else:
-      data = content[1]["itemSectionRenderer"]["contents"]
+    data = subprocess.check_output(f'./search https://www.youtube.com/results?search_query={u.parse.quote(content).replace("%20", "+")}', shell=True).decode("utf-8")
+    data = json.loads(data)
     result = []
     for i in data:
       if "videoRenderer" in i:
@@ -72,21 +62,16 @@ class Pytdl:
           "thumbnail": i["videoRenderer"]["thumbnail"]["thumbnails"][0]["url"],
           "length": "0:00"
         })
+        print(result[-1]["title"])
         if "lengthText" in i["videoRenderer"]:
           result[-1]["length"] = i["videoRenderer"]["lengthText"]["simpleText"]
     return result
 
   async def searchList(self, list_id : str):
-    async with ClientSession() as session:
-      response = await self.__fetch(f'https://www.youtube.com/playlist?list={list_id}', session)
-    scripts = bs(response, "html.parser").find_all("script")
-    for js in scripts:
-      if len(str(js)) > 100000:
-        script = str(js)
-    obj = json.loads(script.replace(script[:script.find("var")], "").strip(";\n// scraper_data_end\n</script>").strip("var ytInitialData = "))
-    content = obj["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]
+    data = subprocess.check_output(f'./search https://www.youtube.com/playlist?list={list_id} list', shell=True).decode("utf-8")
+    data = json.loads(data)
     result = []
-    for i in content:
+    for i in data:
       if "playlistVideoRenderer" in i:
         if "videoId" in i["playlistVideoRenderer"]:
           result.append(f'https://youtu.be/{i["playlistVideoRenderer"]["videoId"]}')

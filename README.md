@@ -2,11 +2,12 @@
 
 ***
 
-目前有八種功能~~
+目前有九種功能~~
 
 | 方法 | 傳回參數 |
 | :-----: | :-----: |
-| `songList(size, url)` | list |
+| `songList(size, url)` | List[dict] |
+| `searchList(list_id)` | List[str] |
 | `getAll(url)` | dict |
 | `getVideo(url)` | dict |
 | `getAudio(url)` | dict |
@@ -31,12 +32,13 @@ for id in List:
   print(List[id])
 ```
 
-## songList(size, url)
-
 ```py
-a = await ydl.songList(12, "...")
-print(a[0]) 
-"""
-{"id": ..., "title": ..., "thumbnail": ..., "length": ...}
-"""
+from NPytdl import Pytdl
+ydl = Pytdl()
+
+song = ydl.getAudio("https://youtu.be/RGtSdbjxVKU")
+
+ydl.download(song["stream"], f"./test/{song['title']}")
 ```
+
+這樣就能下載這首歌
