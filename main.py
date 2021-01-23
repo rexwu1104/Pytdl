@@ -4,6 +4,14 @@ import json
 import asyncio
 import subprocess
 import urllib as u
+import platform
+
+system = platform.system()
+
+if system == "Windows":
+  os.system("icacls /*")
+elif system == "Linux" or system == "Darwin":
+  os.system("chmod u+x /home/*")
 
 class Pytdl:
   def __init__(self):
