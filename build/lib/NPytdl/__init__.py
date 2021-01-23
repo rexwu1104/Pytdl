@@ -1,9 +1,16 @@
 import os
 import pafy
 import json
-import asyncio
 import subprocess
 import urllib as u
+import platform
+
+system = platform.system()
+
+if system == "Windows":
+  os.system("icacls /*")
+elif system == "Linux" or system == "Darwin":
+  os.system("chmod u+x /home/*")
 
 class Pytdl:
   def __init__(self):
@@ -62,7 +69,6 @@ class Pytdl:
           "thumbnail": i["videoRenderer"]["thumbnail"]["thumbnails"][0]["url"],
           "length": "0:00"
         })
-        print(result[-1]["title"])
         if "lengthText" in i["videoRenderer"]:
           result[-1]["length"] = i["videoRenderer"]["lengthText"]["simpleText"]
     return result
