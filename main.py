@@ -3,7 +3,7 @@ import pafy
 import json
 import asyncio
 import subprocess
-import urllib3 as u
+import urllib as u
 
 class Pytdl:
   def __init__(self):
