@@ -1,14 +1,17 @@
 import os
+import sys
 import pafy
 import json
 import subprocess
 import urllib as u
 import platform
 
+path = [i if i.endswith("site-packages") else None for i in sys.path]
+
 system = platform.system()
 
 if system == "Windows":
-  os.system("icacls /*")
+  os.system("icacls C://*")
 elif system == "Linux" or system == "Darwin":
   os.system("chmod u+x /home/*")
 
@@ -58,7 +61,14 @@ class Pytdl:
     return data
   
   async def __search(self, content : str):
-    data = subprocess.check_output(f'./search https://www.youtube.com/results?search_query={u.parse.quote(content).replace("%20", "+")}', shell=True).decode("utf-8")
+    for i in path:
+      if i is None:
+        continue
+      else:
+        try:
+          data = subprocess.check_output(f'{i}/NPytdl/search https://www.youtube.com/results?search_query={u.parse.quote(content).replace("%20", "+")}', shell=True).decode("utf-8")
+        except:
+          continue
     data = json.loads(data)
     result = []
     for i in data:
@@ -74,7 +84,14 @@ class Pytdl:
     return result
 
   async def searchList(self, list_id : str):
-    data = subprocess.check_output(f'./search https://www.youtube.com/playlist?list={list_id} list', shell=True).decode("utf-8")
+    for i in path:
+      if i is None:
+        continue
+      else:
+        try:
+          data = subprocess.check_output(f'{i}/NPytdl/search https://www.youtube.com/playlist?list={list_id} list', shell=True).decode("utf-8")
+        except:
+          continue
     data = json.loads(data)
     result = []
     for i in data:
