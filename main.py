@@ -12,9 +12,13 @@ path = [i if i.endswith("site-packages") else None for i in sys.path]
 system = platform.system()
 
 if system == "Windows":
-  os.system("icacls C://*")
+  for i in path:
+    if i is not None:
+      os.system(f"icacls {i}/*")
 elif system == "Linux" or system == "Darwin":
-  os.system("chmod u+x /home/*")
+  for i in path:
+    if i is not None:
+      os.system(f"chmod u+x {i}/*")
 
 class Pytdl:
   def __init__(self):
