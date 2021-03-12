@@ -1,310 +1,256 @@
 import os
-import sys
-import pafy
+import youtube_dl
+from typing import List
+from aiohttp import ClientSession
+import re
 import json
 import asyncio
-import subprocess
-import urllib as u
-import platform
 
-path = [i if i.endswith("site-packages") else None for i in sys.path]
+class UnKnownError(Exception):
+	pass
 
-system = platform.system()
+class __Logger:
+	def debug(self, msg):
+		pass
 
-if system == "Windows":
-  for i in path:
-    if i is not None:
-      os.system(f"icacls {i}/*")
-elif system == "Linux" or system == "Darwin":
-  for i in path:
-    if i is not None:
-      os.system(f"chmod u+x {i}/*")
+	def warning(self, msg):
+		pass
+
+	def error(self, msg):
+		pass
+
+def __hook(data):
+	if data["status"] == "finished":
+		print("downing successful.")
+
+class Stream:
+	def __init__(self, url : str):
+		self.__url = url
+
+	def download(self, path : str = "./"):
+		ydl_opts = {
+    	'format': 'bestaudio/best',
+    	'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    	}],
+    	'logger': globals()["__Logger"](),
+    	'progress_hooks': [globals()["__hook"]],
+			'outtmpl': path if path != "./" else "./%(id)s.mp3",
+		}
+
+		with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+			ydl.extract_info(self.__url, download=True)
+
+class Song:
+	ydl_opts = {
+    'format': 'bestaudio/best',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+    'logger': globals()["__Logger"](),
+    'progress_hooks': [globals()["__hook"]]
+	}
+	
+	def __duration(self, seconds : int):
+		h, m, s = (seconds//3600, seconds//60-(seconds//3600)*60, seconds%60)
+		result = f"{h if h > 10 else f'0{h}'}:{m if m > 10 else f'0{m}'}:{s if s > 10 else f'0{s}'}"
+		if (result := result.split(":"))[0] == "00":
+			return result[1] + ":" + result[2]
+		return ":".join(result)
+
+	async def __get(self, url : str):
+		with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
+			return ydl.extract_info(url, download=False)
+
+	def __init__(self, url : str, **kwargs):
+		if not re.fullmatch(r'https://w{0,3}\.?youtu(\.be/|be\.com/watch\?v=)[a-zA-Z0-9]*', url):
+			raise TypeError("url is not a youtube video url")
+		if kwargs.get("data") is None:
+			data = asyncio.run(self.__get(url))
+		else:
+			data = kwargs.get("data")
+		self.duration = self.__duration(data["duration"])
+		self.id = data["id"]
+		self.thumbnail = data["thumbnail"]
+		self.video_url = data["webpage_url"]
+		self.voice_url = data["url"]
+		self.title = data["title"]
+		self.stream = Stream(data["webpage_url"])
+
+class SongList:
+	ydl_opts = {
+    'format': 'bestaudio/best',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+    'logger': globals()["__Logger"](),
+    'progress_hooks': [globals()["__hook"]]
+	}
+
+	def __get(self, list_url : str):
+		with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
+			return ydl.extract_info(list_url, False)
+
+	def __init__(self, list_url : str):
+		if not re.fullmatch(r'https://www\.youtube\.com/playlist\?list=[a-zA-Z0-9]*', list_url):
+			raise TypeError("url is not a youtube list url")
+		data = self.__get(list_url).get("entries")
+		self.songs = [Song("https://youtu.be/", data=entry) for entry in data]
+		print(self.songs)
 
 class Pytdl:
-  def __init__(self):
-    self.__nowData = {}
-    self.__prevData = {}
-    self.__noNeed = [
-      "_ydl_info",
-      "_ydl_opts",
-      "version",
-      "callback",
-      "_have_basic",
-      "_have_gdata",
-      "_username",
-      "_streams",
-      "_oggstreams",
-      "_m4astreams",
-      "_allstreams",
-      "_videostreams",
-      "_keywords",
-      "_bigthumb",
-      "_bigthumbhd",
-      "_mix_pl",
-      "expiry"
-    ]
-    pafy.set_api_key("AIzaSyBxmDSkfH8mSQCGKe1PiKaOdohHI0BeLDg")
+	__api_key = "AIzaSyB5k7wA5-9inJlw5lKIzlTYduTzZekpgjc"
+	__head = "https://www.googleapis.com/youtube/v3/"
+	__Search = "search?part=snippet&q={}&key={}&type=video" #搜尋
+	# __Commanets = "commentThreads?part=snippet,contentDetails,replies&videoId={}&key={}" #留言
+	__PlayList = "playlistItems?part=snippet,contentDetails&playlistId={}&key={}" #播放清單
+	# __Channel = "channels?part=snippet,contentDetails&id={}&key={}" #頻道
+	__Video = "videos?id={}&key={}&part=snippet,contentDetails" #影片
+	__NextPage = "&pageToken={}" #下一頁
+	__max = "&maxResults={}"
 
-  def setup(self):
-    pafy.set_api_key("AIzaSyBxmDSkfH8mSQCGKe1PiKaOdohHI0BeLDg")
+	async def __duration(self, time_str : str):
+		time_str = time_str.strip("PT").strip("S")
+		if time_str.find("H") != -1 and time_str.find("M") == -1:
+			time_str = time_str.replace("H", ":00:")
+		else:
+			time_str = time_str.replace("H", ":").replace("M", ":")
+			if int("00" + (time_str := time_str.split(":"))[1]) < 10:
+				time_str[1] = "0" + time_str[1]
+				if time_str[1] == "0":
+					time_str += "0"
+				time_str = ":".join(time_str)
+		if type(time_str) == list:
+			time_str = ":".join(time_str)
+		return time_str
 
-  async def __datatry(self, ex, *args):
-    a=True
-    times = 0
-    while a:
-      if times == 3:
-        raise Exception("Can't get this data.")
-      try:
-        data = await ex(*args)
-        a = False
-      except TypeError:
-        data = ex(*args)
-        a = False
-      except:
-        times += 1
-        continue
-    return data
-  
-  async def __search(self, content : str):
-    for i in path:
-      if i is None:
-        continue
-      else:
-        try:
-          data = subprocess.check_output(f'{i}/NPytdl/search https://www.youtube.com/results?search_query={u.parse.quote(content).replace("%20", "+")}', shell=True).decode("utf-8")
-        except:
-          continue
-    data = json.loads(data)
-    result = []
-    for i in data:
-      if "videoRenderer" in i:
-        result.append({
-          "id": i["videoRenderer"]["videoId"],
-          "title": i["videoRenderer"]["title"]["runs"][0]["text"],
-          "thumbnail": i["videoRenderer"]["thumbnail"]["thumbnails"][0]["url"],
-          "length": "0:00"
-        })
-        if "lengthText" in i["videoRenderer"]:
-          result[-1]["length"] = i["videoRenderer"]["lengthText"]["simpleText"]
-    return result
+	async def __fetch(self, link : str, session : ClientSession):
+		async with session.get(link) as response:
+			html_body = await response.text()
+			return html_body
 
-  async def searchList(self, list_id : str):
-    for i in path:
-      if i is None:
-        continue
-      else:
-        try:
-          data = subprocess.check_output(f'{i}/NPytdl/search https://www.youtube.com/playlist?list={list_id} list', shell=True).decode("utf-8")
-        except:
-          continue
-    data = json.loads(data)
-    result = []
-    for i in data:
-      if "playlistVideoRenderer" in i:
-        if "videoId" in i["playlistVideoRenderer"]:
-          result.append(f'https://youtu.be/{i["playlistVideoRenderer"]["videoId"]}')
-    return result    
+	async def __video(self, id_list : List[str]):
+		async with ClientSession() as session:
+			idData = await self.__fetch(self.__head + self.__Video.format(",".join(id_list), self.__api_key), session)
+			idData = json.loads(idData)
+		results = []
+		for item in idData["items"]:
+			thumbnails = item["snippet"]["thumbnails"]
+			results.append({
+				"id": item["id"],
+				"title": item["snippet"]["title"],
+				"thumbnail": [thumbnails[i]["url"] for i in thumbnails],
+				"length": await self.__duration(item["contentDetails"]["duration"])
+			})
+		return results
 
-  async def __getPafy(self, url : str):
-    self.__nowData = {}
-    self.__prevData = {}
-    self.__noNeed = [
-      "_ydl_info",
-      "_ydl_opts",
-      "version",
-      "callback",
-      "_have_basic",
-      "_have_gdata",
-      "_username",
-      "_streams",
-      "_oggstreams",
-      "_m4astreams",
-      "_allstreams",
-      "_videostreams",
-      "_keywords",
-      "_bigthumb",
-      "_bigthumbhd",
-      "_mix_pl",
-      "expiry"
-    ]
-    if url.find("list=") != -1:
-      raise RuntimeError("This isn't a snog.")
-    if url.find("https://") == -1:
-      url = await self.__search(url)[0]["id"]
-    a=True
-    while a:
-      try:
-        data = await self.__datatry(pafy.new, url)
-        a=False
-      except:
-        continue
-    for property, content in vars(data).items():
-      if property in self.__noNeed: continue
-      self.__nowData[property.strip("_")] = content
-    self.__prevData = self.__nowData
-    return data
+	async def songList(self, query : str, size : int = 12):
+		async with ClientSession() as session:
+			songData = json.loads(await self.__fetch(self.__head + self.__Search.format(query, self.__api_key) + self.__max.format(size), session))
+		return await self.__video([item["id"]["videoId"] for item in songData["items"]])
 
-  async def songList(self, size : int, url : str):
-    data = await self.__search(url)
-    results = []
-    if len(data) < size:
-      size = len(data)
-    for i in range(0, size):
-      results.append(data[i])
-    return results
+	async def searchList(self, listId : str):
+		async with ClientSession() as session:
+			listData = await self.__fetch(self.__head + self.__PlayList.format(listId, self.__api_key) + self.__max.format(40), session)
+			listData = json.loads(listData)
+			# print(listData)
+			print(len(listData["items"]))
+		return ["https://youtu.be/" + item["contentDetails"]["videoId"] for item in listData["items"]]
 
-  async def getAll(self, url : str):
-    if url.find("list=") != -1:
-      raise RuntimeError("This isn't a snog.")
-    all = await self.__getPafy(url)
-    audio = await self.__datatry(all.getbest)
-    all_data = {
-      "stream": audio,
-      "url": {
-        "vurl": self.__nowData["watchv_url"],
-        "aurl": audio.url_https
-      },
-      "id": self.__nowData["videoid"],
-    }
-    all_data = {**self.__nowData, **all_data}
-    del all_data["watchv_url"]
-    del all_data["videoid"]
-    return all_data
+	async def songs(self, querys : List[str]):
+		async with ClientSession() as session:
+			searchList = [asyncio.create_task(self.__fetch(self.__head + self.__Search.format(query, self.__api_key) + self.__max.format(12), session)) for query in querys]
+			data = await asyncio.gather(*searchList)
+			data = [await self.__video(Ids) for Ids in [list(map(lambda x: x["id"]["videoId"], items)) for items in [json.loads(S)["items"] for S in data]]]
 
-  async def getVideo(self, url : str):
-    if url.find("list=") != -1:
-      raise RuntimeError("This isn't a snog.")
-    video = await self.__getPafy(url)
-    video_data = {
-      "stream": await self.__datatry(video.getbestvideo),
-      "url": self.__nowData["watchv_url"],
-      "id": video.videoid,
-    }
-    video_data = {**self.__nowData, **video_data}
-    del video_data["watchv_url"]
-    del video_data["videoid"]
-    return video_data
-
-  async def getAudio(self, url : str):
-    video = await self.__getPafy(url)
-    audio = await self.__datatry(video.getbestaudio)
-    audio_data = {
-      "stream": audio,
-      "url": audio.url_https,
-      "id": video.videoid,
-      "title": video.title,
-      "length": video.length
-    }
-    return audio_data
-
-  async def __getList(self, url : str):
-    return await self.__datatry(self.searchList, url)
-
-  async def getAudioList(self, url : str, stream : bool = True):
-    if url.find("list=") == -1:
-      raise RuntimeError("This isn't a list")
-    data_list = await self.__getList(url.split("list=")[1])
-    audio_list = {}
-    for i in data_list:
-      Pafy = await self.getAudio(i)
-      audio_list[Pafy["id"]] = Pafy
-    return audio_list
-
-  async def getVideoList(self, url : str, stream : bool = True):
-    if url.find("list=") == -1:
-      raise RuntimeError("This isn't a list")
-    data_list = await self.__getList(url.split("list=")[1])
-    video_list = {}
-    for i in data_list:
-      Pafy = await self.getVideo(i)
-      video_list[Pafy["id"]] = Pafy
-    return video_list
-
-  async def getAllList(self, url : str, stream : bool = True):
-    if url.find("list=") == -1:
-      raise RuntimeError("This isn't a list")
-    data_list = await self.__getList(url.split("list=")[1])
-    video_list = {}
-    for i in data_list:
-      Pafy = await self.getAll(i)
-      video_list[Pafy["id"]] = Pafy
-    return video_list
-  
-  def download(self, stream, path : str):
-    stream.download(filepath=path, quiet=True)
+	async def info(self, url : str):
+		try:
+			return Song(url)
+		except TypeError:
+			return SongList(url)
+		except:
+			raise UnKnownError("not a correct url.")
 
 ydl = Pytdl()
-loop = asyncio.get_event_loop()
 
-print("歡迎使用Pytdl。")
-# os.system("python")
+# ydl = Pytdl()
+# loop = asyncio.get_event_loop()
 
-while True:
-  print("請問你要下載什麼歌曲呢?")
-  print("請輸入網址或是你想搜尋的影片名稱。")
-  name = input()
-  os.system("clear")
-  if name.find("https://") == -1:
-    print("看來這不是個網址呢")
-    print("沒關係，我幫你搜尋")
-    songs = loop.run_until_complete(ydl.songList(12, name))
-    for i in range(1, len(songs)+1):
-      print(str(i)+".", songs[i-1]["title"])
-    print("請問是哪一首呢 (請輸入數字)")
-    num=int(input())
-    while num > len(songs) or num < 1:
-      os.system("clear")
-      print("不好意思，這不再範圍內呢")
-      print("請問是哪一首呢 (請輸入數字)")
-      num=int(input())
-    os.system("clear")
-    name = "https://youtu.be/" + songs[num-1]["id"]
-  else:
-    print("好的，幫你搜尋")
-  print("那你要什麼類型?")
-  print("有 audio, video 和 normal")
-  t=input()
-  os.system("clear")
-  while t not in ["audio", "video", "normal"]:
-    print("沒有這個類型耶")
-    print("我們有 audio, video 和 normal")
-    t=input()
-  if name.find("list=") != -1:
-    if t == "audio":
-      songs = loop.run_until_complete(ydl.getAudioList(name))
-      for i in songs:
-        ydl.download(songs[i]["stream"], f'./test/{songs[i]["title"]}.mp3')
-    elif t == "video":
-      pass
-    elif t == "normal":
-      pass
-  else:
-    if t == "audio":
-      print("OK. 幫你下載音訊")
-      audio = loop.run_until_complete(ydl.getAudio(name))
-      ydl.download(audio["stream"], f'{audio["title"]}.mp3')
-      if os.path.isfile(f'{audio["title"]}.wav') == True:
-        print("下載完成")
-      else:
-        print("下載失敗")
-    elif t == "video":
-      print("OK. 幫你下載影片")
-      video = loop.run_until_complete(ydl.getVideo(name))
-      ydl.download(video["stream"], f'{video["title"]}.mp4')
-      if os.path.isfile(f'{video["title"]}.mp4') == True:
-        print("下載完成")
-      else:
-        print("下載失敗")
-    elif t == "normal":
-      print("OK. 幫你下載影片及音訊")
-      video = loop.run_until_complete(ydl.getAll(name))
-      ydl.download(video["stream"], f'{video["title"]}.mp4')
-      if os.path.isfile(f'{video["title"]}.mp4') == True:
-        print("下載完成")
-      else:
-        print("下載失敗")
-  print("請問你還要下載嗎? (Y/N)")
-  ans=input()
-  if ans == "N" or ans == "n":
-    break
-  os.system("clear")
+# print("歡迎使用Pytdl。")
+# # os.system("python")
+
+# while True:
+#   print("請問你要下載什麼歌曲呢?")
+#   print("請輸入網址或是你想搜尋的影片名稱。")
+#   name = input()
+#   os.system("clear")
+#   if name.find("https://") == -1:
+#     print("看來這不是個網址呢")
+#     print("沒關係，我幫你搜尋")
+#     songs = loop.run_until_complete(ydl.songList(12, name))
+#     for i in range(1, len(songs)+1):
+#       print(str(i)+".", songs[i-1]["title"])
+#     print("請問是哪一首呢 (請輸入數字)")
+#     num=int(input())
+#     while num > len(songs) or num < 1:
+#       os.system("clear")
+#       print("不好意思，這不再範圍內呢")
+#       print("請問是哪一首呢 (請輸入數字)")
+#       num=int(input())
+#     os.system("clear")
+#     name = "https://youtu.be/" + songs[num-1]["id"]
+#   else:
+#     print("好的，幫你搜尋")
+#   print("那你要什麼類型?")
+#   print("有 audio, video 和 normal")
+#   t=input()
+#   os.system("clear")
+#   while t not in ["audio", "video", "normal"]:
+#     print("沒有這個類型耶")
+#     print("我們有 audio, video 和 normal")
+#     t=input()
+#   if name.find("list=") != -1:
+#     if t == "audio":
+#       songs = loop.run_until_complete(ydl.getAudioList(name))
+#       for i in songs:
+#         ydl.download(songs[i]["stream"], f'./test/{songs[i]["title"]}.mp3')
+#     elif t == "video":
+#       pass
+#     elif t == "normal":
+#       pass
+#   else:
+#     if t == "audio":
+#       print("OK. 幫你下載音訊")
+#       audio = loop.run_until_complete(ydl.getAudio(name))
+#       ydl.download(audio["stream"], f'{audio["title"]}.mp3')
+#       if os.path.isfile(f'{audio["title"]}.mp3') == True:
+#         print("下載完成")
+#       else:
+#         print("下載失敗")
+#     elif t == "video":
+#       print("OK. 幫你下載影片")
+#       video = loop.run_until_complete(ydl.getVideo(name))
+#       ydl.download(video["stream"], f'{video["title"]}.mp4')
+#       if os.path.isfile(f'{video["title"]}.mp4') == True:
+#         print("下載完成")
+#       else:
+#         print("下載失敗")
+#     elif t == "normal":
+#       print("OK. 幫你下載影片及音訊")
+#       video = loop.run_until_complete(ydl.getAll(name))
+#       ydl.download(video["stream"], f'{video["title"]}.mp4')
+#       if os.path.isfile(f'{video["title"]}.mp4') == True:
+#         print("下載完成")
+#       else:
+#         print("下載失敗")
+#   print("請問你還要下載嗎? (Y/N)")
+#   ans=input()
+#   if ans == "N" or ans == "n":
+#     break
+#   os.system("clear")
