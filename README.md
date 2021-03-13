@@ -36,13 +36,20 @@ info 回傳的結構為
 [Song() | SongList(), ...]
 ```
 
+Song 與 SongList 要使用 create 創建其結構 (async func)
+
+SongList 創建後的 SongList.songs 為一個 list
+
 ```py
 from NPytdl import Pytdl
 ydl = Pytdl()
 
 song = ydl.info("https://youtu.be/RGtSdbjxVKU")
 
-song.download(f"./test/{song['title']}")
+import asyncio
+asyncio.run(song.create())
+
+song.download(f"./test/{song.title}")
 ```
 
 這樣就能下載這首歌

@@ -47,9 +47,9 @@ class Song:
 	ydl_opts = {
     'format': 'bestaudio/best',
     'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
+      'key': 'FFmpegExtractAudio',
+      'preferredcodec': 'mp3',
+      'preferredquality': '192',
     }],
     'logger': globals()["__Logger"](),
     'progress_hooks': [globals()["__hook"]]
@@ -66,28 +66,43 @@ class Song:
 		with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
 			return ydl.extract_info(url, download=False)
 
-	def __init__(self, url : str, **kwargs):
-		if not re.fullmatch(r'https://w{0,3}\.?youtu(\.be/|be\.com/watch\?v=)[a-zA-Z0-9]*', url):
-			raise TypeError("url is not a youtube video url")
-		if kwargs.get("data") is None:
-			data = asyncio.run(self.__get(url))
+	async def create(self):
+		data = await self.__data
+		if type(data) == dict:
+			self.duration = self.__duration(data["duration"])
+			self.id = data["id"]
+			self.thumbnail = data["thumbnail"]
+			self.video_url = data["webpage_url"]
+			self.voice_url = data["url"]
+			self.title = data["title"]
+			self.stream = Stream(data["webpage_url"])
 		else:
-			data = kwargs.get("data")
-		self.duration = self.__duration(data["duration"])
-		self.id = data["id"]
-		self.thumbnail = data["thumbnail"]
-		self.video_url = data["webpage_url"]
-		self.voice_url = data["url"]
-		self.title = data["title"]
-		self.stream = Stream(data["webpage_url"])
+			self.Songs = [Song(data[i]) for i in range(len(data))]
+
+	def __init__(self, url_or_urls_or_data):
+		if type(url_or_urls_or_data) == str and not re.fullmatch(r'https://w{0,3}\.?youtu(\.be/|be\.com/watch\?v=)[a-zA-Z0-9]*', url_or_urls_or_data):
+			raise TypeError("url is not a youtube video url")
+		if type(url_or_urls_or_data) == str:
+			self.__data = asyncio.gather(*[asyncio.create_task(self.__get(url_or_urls_or_data))])
+		elif type(url_or_urls_or_data) == list:
+			self.__data = asyncio.gather(*[asyncio.create_task(self.__get(url)) for url in url_or_urls_or_data])
+		else:
+			data = url_or_urls_or_data
+			self.duration = self.__duration(data["duration"])
+			self.id = data["id"]
+			self.thumbnail = data["thumbnail"]
+			self.video_url = data["webpage_url"]
+			self.voice_url = data["url"]
+			self.title = data["title"]
+			self.stream = Stream(data["webpage_url"])
 
 class SongList:
 	ydl_opts = {
     'format': 'bestaudio/best',
     'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
+      'key': 'FFmpegExtractAudio',
+      'preferredcodec': 'mp3',
+      'preferredquality': '192',
     }],
     'logger': globals()["__Logger"](),
     'progress_hooks': [globals()["__hook"]]
@@ -97,12 +112,14 @@ class SongList:
 		with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
 			return ydl.extract_info(list_url, False)
 
+	async def create(self):
+		self.songs = Song(await self.__data)
+
 	def __init__(self, list_url : str):
-		if not re.fullmatch(r'https://www\.youtube\.com/playlist\?list=[a-zA-Z0-9]*', list_url):
+		if not re.fullmatch(r'https://www\.youtube\.com/(watch\?v=[a-zA-z0-9_-]*&|playlist\?)list=[a-zA-Z0-9_-]*', list_url):
 			raise TypeError("url is not a youtube list url")
-		data = self.__get(list_url).get("entries")
-		self.songs = [Song("https://youtu.be/", data=entry) for entry in data]
-		print(self.songs)
+		ydl = Pytdl()
+		self.__data = ydl.searchList(list_url.split("=")[-1])
 
 class Pytdl:
 	__api_key = "AIzaSyB5k7wA5-9inJlw5lKIzlTYduTzZekpgjc"
@@ -159,8 +176,6 @@ class Pytdl:
 		async with ClientSession() as session:
 			listData = await self.__fetch(self.__head + self.__PlayList.format(listId, self.__api_key) + self.__max.format(40), session)
 			listData = json.loads(listData)
-			# print(listData)
-			print(len(listData["items"]))
 		return ["https://youtu.be/" + item["contentDetails"]["videoId"] for item in listData["items"]]
 
 	async def songs(self, querys : List[str]):
@@ -168,6 +183,7 @@ class Pytdl:
 			searchList = [asyncio.create_task(self.__fetch(self.__head + self.__Search.format(query, self.__api_key) + self.__max.format(12), session)) for query in querys]
 			data = await asyncio.gather(*searchList)
 			data = [await self.__video(Ids) for Ids in [list(map(lambda x: x["id"]["videoId"], items)) for items in [json.loads(S)["items"] for S in data]]]
+			return data
 
 	async def info(self, url : str):
 		try:
@@ -178,8 +194,8 @@ class Pytdl:
 			raise UnKnownError("not a correct url.")
 
 ydl = Pytdl()
+asyncio.run(ydl.songs(["白月光", "nightcore", "枕邊童話", "心動的時刻", "開心的人"]))
 
-# ydl = Pytdl()
 # loop = asyncio.get_event_loop()
 
 # print("歡迎使用Pytdl。")
@@ -193,7 +209,7 @@ ydl = Pytdl()
 #   if name.find("https://") == -1:
 #     print("看來這不是個網址呢")
 #     print("沒關係，我幫你搜尋")
-#     songs = loop.run_until_complete(ydl.songList(12, name))
+#     songs = loop.run_until_complete(ydl.songList(name))
 #     for i in range(1, len(songs)+1):
 #       print(str(i)+".", songs[i-1]["title"])
 #     print("請問是哪一首呢 (請輸入數字)")
@@ -217,9 +233,9 @@ ydl = Pytdl()
 #     t=input()
 #   if name.find("list=") != -1:
 #     if t == "audio":
-#       songs = loop.run_until_complete(ydl.getAudioList(name))
+#       songs = loop.run_until_complete(ydl.info(name))
 #       for i in songs:
-#         ydl.download(songs[i]["stream"], f'./test/{songs[i]["title"]}.mp3')
+#         songs[i].stream.download(f'./test/{songs[i]["title"]}.mp3')
 #     elif t == "video":
 #       pass
 #     elif t == "normal":
@@ -228,7 +244,7 @@ ydl = Pytdl()
 #     if t == "audio":
 #       print("OK. 幫你下載音訊")
 #       audio = loop.run_until_complete(ydl.getAudio(name))
-#       ydl.download(audio["stream"], f'{audio["title"]}.mp3')
+#       audio.stream.download(f'{audio["title"]}.mp3')
 #       if os.path.isfile(f'{audio["title"]}.mp3') == True:
 #         print("下載完成")
 #       else:
