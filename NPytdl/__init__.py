@@ -75,6 +75,15 @@ class Song:
 			self.voice_url = data["url"]
 			self.title = data["title"]
 			self.stream = Stream(data["webpage_url"])
+		elif len(data) == 1:
+			data = data[0]
+			self.duration = self.__duration(data["duration"])
+			self.id = data["id"]
+			self.thumbnail = data["thumbnail"]
+			self.video_url = data["webpage_url"]
+			self.voice_url = data["url"]
+			self.title = data["title"]
+			self.stream = Stream(data["webpage_url"])
 		else:
 			self.Songs = [Song(data[i]) for i in range(len(data))]
 

@@ -75,6 +75,15 @@ class Song:
 			self.voice_url = data["url"]
 			self.title = data["title"]
 			self.stream = Stream(data["webpage_url"])
+		elif len(data) == 1:
+			data = data[0]
+			self.duration = self.__duration(data["duration"])
+			self.id = data["id"]
+			self.thumbnail = data["thumbnail"]
+			self.video_url = data["webpage_url"]
+			self.voice_url = data["url"]
+			self.title = data["title"]
+			self.stream = Stream(data["webpage_url"])
 		else:
 			self.Songs = [Song(data[i]) for i in range(len(data))]
 
@@ -182,6 +191,7 @@ class Pytdl:
 			searchList = [asyncio.create_task(self.__fetch(self.__head + self.__Search.format(query, self.__api_key) + self.__max.format(12), session)) for query in querys]
 			data = await asyncio.gather(*searchList)
 			data = [await self.__video(Ids) for Ids in [list(map(lambda x: x["id"]["videoId"], items)) for items in [json.loads(S)["items"] for S in data]]]
+			return data
 
 	async def info(self, url : str):
 		try:
