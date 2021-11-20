@@ -9,6 +9,9 @@ python = "^3.8"
 aiohttp = "^3.7.3"
 youtube_dl = "^2021.1.8"
 idna = "^2.5"
+bs4 = "^0.0.1"
+orjson = "^3.6.4"
+spotipy = "^2.19.0"
 
 [tool.poetry.dev-dependencies]
 

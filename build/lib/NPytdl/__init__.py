@@ -1,202 +1,284 @@
-import youtube_dl
-from typing import List
-from aiohttp import ClientSession
+import youtube_dl as ydl
 import re
-import json
-import asyncio
+from urllib.parse import quote
+from typing import (
+	Dict,
+	List,
+	Union
+)
+
+__all__ = (
+	'Pytdl',
+	'Stream',
+	'YoutubeVideos',
+	'YoutubeVideo',
+	'SpotifyMusics',
+	'SpotifyMusic',
+	'SpotifyTypeError',
+	'YoutubeTypeError',
+	'SpotifyUrlError',
+	'YoutubeUrlError'
+)
+
+JSON = Dict[str, Union[str, List, Dict]]
+
+from .webBug import get, spotifyGet
+from .dataParser import Parser
+
+sl = re.compile(r'(?:https?://)?open\.spotify\.com/(album|playlist)/([\w\-]+)(?:[?&].+)*')
+yl = re.compile(r'(?:https?://)?(?:youtu\.be/|www\.youtube\.com/playlist\?(?:.+&)*list=)([\w\-]+)(?:[?&].+)*')
+s = re.compile(r'(?:https?://)?open\.spotify\.com/track/([\w\-]+)(?:[?&].+)*')
+y = re.compile(r'(?:https?://)?(?:youtu\.be/|www\.youtube\.com/watch\?(?:.+&)*v=)([\w\-]+)(?:[?&].+)*')
+
+def getId(string, regex):
+	matchs = regex.search(string)
+	match = tuple([string]) + (matchs.groups() if matchs is not None else tuple())
+	length = len(match)
+	if length == 1:
+		return '', ''
+	elif length == 2:
+		return match[0], match[1]
+	else:
+		return match[0], match[2], match[1]		
+
+from base64 import b64decode
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials as SCC
+
+client_id = \
+	b64decode(b'N2U0ZDI2ZDAyMjNlNDkxNzgzMmI1NDIxNmZmODE2OWU=') \
+	.decode()
+client_secret = \
+	b64decode(b'NTc0YWViNzY2MmMxNDNiM2EwMThjODYwZDI5M2I4ZmU=') \
+	.decode()
+
+sp = spotipy.Spotify(auth_manager=SCC(
+	client_id = client_id,
+	client_secret = client_secret
+))
+
+def dp(d : int) -> str:
+	result = ''
+	h = d // 3600
+	m = (d - h * 3600) // 60
+	s = (d - h * 3600) - m * 60
+
+	if h < 10:
+		result += '0' + str(h)
+	else:
+		result += str(h)
+	result += ':'
+	if m < 10:
+		result += '0' + str(m)
+	else:
+		result += str(m)
+	result += ':'
+	if s < 10:
+		result += '0' + str(s)
+	else:
+		result += str(s)
+
+	return result
 
 class UnKnownError(Exception):
-	pass
+	...
 
-class __Logger:
-	def debug(self, msg):
-		pass
+class SpotifyTypeError(Exception):
+	...
 
-	def warning(self, msg):
-		pass
+class YoutubeTypeError(Exception):
+	...
 
-	def error(self, msg):
-		pass
+class SpotifyUrlError(Exception):
+	...
 
-def __hook(data):
-	if data["status"] == "finished":
-		print("downing successful.")
+class YoutubeUrlError(Exception):
+	...
+
+class Logger:
+	def debug(self, msg : str): ...
+	def warning(self, msg : str): ...
+	def error(self, msg : str): ...
 
 class Stream:
 	def __init__(self, url : str):
 		self.__url = url
 
-	def download(self, path : str = "./"):
-		ydl_opts = {
-    	'format': 'bestaudio/best',
-    	'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    	}],
-    	'logger': globals()["__Logger"](),
-    	'progress_hooks': [globals()["__hook"]],
-			'outtmpl': path if path != "./" else "./%(id)s.mp3",
+	def download(self, path : str = './'):
+		self.opt = {
+			'format': 'bestaudio/best',
+			'postprocessors': [{
+				'key': 'FFmpegExtractAudio',
+				'preferredcodec': 'mp3',
+				'preferredquality': '192'
+			}],
+			'logger': Logger(),
+			'outtmpl': path if path != "./" else "./%(id)s.mp3"
+		}
+		
+		with ydl.YoutubeDL(self.opt) as dl:
+			dl.extract_info(self.__url, download=True)
+
+class SpotifyMusics:
+	def __init__(self, url : str):
+		if not (getId(url, sl)[1] or getId(url, s)[1]):
+			raise SpotifyTypeError('%s is not a spotify url' % (url))
+		elif not getId(url, sl)[1]:
+			raise SpotifyUrlError('%s is not a spotify list url' % (url))
+
+		self.__url = url
+		self.__type = url.split('/')[3]
+
+	async def create(self) -> None:
+		self.ytdl : Pytdl = Pytdl()
+		if self.__type == 'album':
+			sl = await self.ytdl.spotifyResultList(self.__url)
+		else:
+			sl = await self.ytdl.spotifyPlayList(self.__url)
+
+		self.musicList = []
+		for s in sl:
+			data = (await self.resultList(s['title']))[0]
+			self.musicList.append(
+				YoutubeVideo('https://www.youtube.com/watch?v=' + data['id'], data)
+			)
+
+class YoutubeVideos:
+	def __init__(self, url : str):
+		if not (getId(url, yl)[1] or getId(url, y)[1]):
+			raise YoutubeTypeError('%s is not a youtube url' % (url))
+		elif not getId(url, yl)[1]:
+			raise YoutubeUrlError('%s is not a youtube list url' % (url))
+
+		self.__url = url
+
+	async def create(self) -> None:
+		self.ytdl : Pytdl = Pytdl()
+		yl = await self.ytdl.PlayList(self.__url.split('=')[0])
+
+		self.videoList = []
+		for y in yl:
+			self.videoList.append(
+				YoutubeVideo('https://www.youtube.com/watch?v=' + y['id'], y)
+			)
+
+class SpotifyMusic:
+	def __init__(self, url : str):
+		if not (getId(url, sl)[1] or getId(url, s)[1]):
+			raise YoutubeTypeError('%s is not a youtube url' % (url))
+		elif not getId(url, s)[1]:
+			raise YoutubeUrlError('%s is not a youtube list url' % (url))
+
+		self.__url = url
+
+	async def create(self) -> None:
+		self.ytdl : Pytdl = Pytdl()
+		s = (await self.ytdl.spotifyTrack(self.__url.split('/')[4]))[0]
+
+		y = (await self.ytdl.resultList(s['title']))[0]
+		self.music = YoutubeVideo(
+			'http://www.youtube.com/watch?v=' + y['id'],
+			y
+		)
+
+class YoutubeVideo:
+	def __init__(self, url : str, data : JSON = {}):
+		if not (getId(url, yl)[1] or getId(url, y)[1]):
+			raise YoutubeTypeError('%s is not a youtube url' % (url))
+		elif not  getId(url, y)[1]:
+			raise YoutubeUrlError('%s is not a youtube list url' % (url))
+
+		self.__url = url
+		self.__data = data
+
+	async def create(self) -> None:
+		self.opt = {
+			'format': 'bestaudio/best',
+			'postprocessors': [{
+				'key': 'FFmpegExtractAudio',
+				'preferredcodec': 'mp3',
+				'preferredquality': '192'
+			}],
+			'logger': Logger()
 		}
 
-		with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-			ydl.extract_info(self.__url, download=True)
+		data = self.__data
+		with ydl.YoutubeDL(self.opt) as dl:
+			info = dl.extract_info(self.__url, download=False)
 
-class Song:
-	ydl_opts = {
-    'format': 'bestaudio/best',
-    'postprocessors': [{
-      'key': 'FFmpegExtractAudio',
-      'preferredcodec': 'mp3',
-      'preferredquality': '192',
-    }],
-    'logger': globals()["__Logger"](),
-    'progress_hooks': [globals()["__hook"]]
-	}
-	
-	def __duration(self, seconds : int):
-		h, m, s = (seconds//3600, seconds//60-(seconds//3600)*60, seconds%60)
-		result = f"{h if h > 10 else f'0{h}'}:{m if m > 10 else f'0{m}'}:{s if s > 10 else f'0{s}'}"
-		if (result := result.split(":"))[0] == "00":
-			return result[1] + ":" + result[2]
-		return ":".join(result)
-
-	async def __get(self, url : str):
-		with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
-			return ydl.extract_info(url, download=False)
-
-	async def create(self):
-		data = await self.__data
-		if type(data) == dict:
-			self.duration = self.__duration(data["duration"])
-			self.id = data["id"]
-			self.thumbnail = data["thumbnail"]
-			self.video_url = data["webpage_url"]
-			self.voice_url = data["url"]
-			self.title = data["title"]
-			self.stream = Stream(data["webpage_url"])
-		elif len(data) == 1:
-			data = data[0]
-			self.duration = self.__duration(data["duration"])
-			self.id = data["id"]
-			self.thumbnail = data["thumbnail"]
-			self.video_url = data["webpage_url"]
-			self.voice_url = data["url"]
-			self.title = data["title"]
-			self.stream = Stream(data["webpage_url"])
+		if len(data) != 0:
+			self.id = data['id']
+			self.title = data['title']
+			self.duration = data['length']
+			self.thumbnail = data['thumbnail']
 		else:
-			self.Songs = [Song(data[i]) for i in range(len(data))]
-
-	def __init__(self, url_or_urls_or_data):
-		if type(url_or_urls_or_data) == str and not re.fullmatch(r'https://w{0,3}\.?youtu(\.be/|be\.com/watch\?v=)[a-zA-Z0-9]*', url_or_urls_or_data):
-			raise TypeError("url is not a youtube video url")
-		if type(url_or_urls_or_data) == str:
-			self.__data = asyncio.gather(*[asyncio.create_task(self.__get(url_or_urls_or_data))])
-		elif type(url_or_urls_or_data) == list:
-			self.__data = asyncio.gather(*[asyncio.create_task(self.__get(url)) for url in url_or_urls_or_data])
-		else:
-			data = url_or_urls_or_data
-			self.duration = self.__duration(data["duration"])
-			self.id = data["id"]
-			self.thumbnail = data["thumbnail"]
-			self.video_url = data["webpage_url"]
-			self.voice_url = data["url"]
-			self.title = data["title"]
-			self.stream = Stream(data["webpage_url"])
-
-class SongList:
-	ydl_opts = {
-    'format': 'bestaudio/best',
-    'postprocessors': [{
-      'key': 'FFmpegExtractAudio',
-      'preferredcodec': 'mp3',
-      'preferredquality': '192',
-    }],
-    'logger': globals()["__Logger"](),
-    'progress_hooks': [globals()["__hook"]]
-	}
-
-	def __get(self, list_url : str):
-		with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
-			return ydl.extract_info(list_url, False)
-
-	async def create(self):
-		self.songs = Song(await self.__data)
-
-	def __init__(self, list_url : str):
-		if not re.fullmatch(r'https://www\.youtube\.com/(watch\?v=[a-zA-z0-9_-]*&|playlist\?)list=[a-zA-Z0-9_-]*', list_url):
-			raise TypeError("url is not a youtube list url")
-		ydl = Pytdl()
-		self.__data = ydl.searchList(list_url.split("=")[-1])
+			self.id = info['id']
+			self.title = info['title']
+			self.duration = dp(info['duration'])
+			self.thumbnail = info['thumbnail']
+		self.video_url = info['webpage_url']
+		self.voice_url = info['url']
+		self.stream = Stream(info['webpage_url'])
 
 class Pytdl:
-	__api_key = "AIzaSyB5k7wA5-9inJlw5lKIzlTYduTzZekpgjc"
-	__head = "https://www.googleapis.com/youtube/v3/"
-	__Search = "search?part=snippet&q={}&key={}&type=video" #搜尋
-	# __Commanets = "commentThreads?part=snippet,contentDetails,replies&videoId={}&key={}" #留言
-	__PlayList = "playlistItems?part=snippet,contentDetails&playlistId={}&key={}" #播放清單
-	# __Channel = "channels?part=snippet,contentDetails&id={}&key={}" #頻道
-	__Video = "videos?id={}&key={}&part=snippet,contentDetails" #影片
-	__NextPage = "&pageToken={}" #下一頁
-	__max = "&maxResults={}"
+	__VideoSearchUrl = \
+	'https://www.youtube.com/results?search_query=%s'
+	__PlaylistSearchUrl = \
+	'https://www.youtube.com/playlist?list=%s'
+	__IdUrl = __NextSearchUrl = \
+	'https://www.youtube.com/watch?v=%s'
 
-	async def __duration(self, time_str : str):
-		time_str = time_str.strip("PT").strip("S")
-		if time_str.find("H") != -1 and time_str.find("M") == -1:
-			time_str = time_str.replace("H", ":00:")
-		else:
-			time_str = time_str.replace("H", ":").replace("M", ":")
-			if int("00" + (time_str := time_str.split(":"))[1]) < 10:
-				time_str[1] = "0" + time_str[1]
-				if time_str[1] == "0":
-					time_str += "0"
-				time_str = ":".join(time_str)
-		if type(time_str) == list:
-			time_str = ":".join(time_str)
-		return time_str
+	async def resultList(self, query : str) -> List[JSON]:
+		return await get(
+			self.__VideoSearchUrl % (quote(query)),
+			Parser('search')
+		)
 
-	async def __fetch(self, link : str, session : ClientSession):
-		async with session.get(link) as response:
-			html_body = await response.text()
-			return html_body
+	async def spotifyResultList(self, query : str) -> List[JSON]:
+		return await spotifyGet(
+			query,
+			Parser('spotifyAlbum')
+		)
 
-	async def __video(self, id_list : List[str]):
-		async with ClientSession() as session:
-			idData = await self.__fetch(self.__head + self.__Video.format(",".join(id_list), self.__api_key), session)
-			idData = json.loads(idData)
-		results = []
-		for item in idData["items"]:
-			thumbnails = item["snippet"]["thumbnails"]
-			results.append({
-				"id": item["id"],
-				"title": item["snippet"]["title"],
-				"thumbnail": [thumbnails[i]["url"] for i in thumbnails],
-				"length": await self.__duration(item["contentDetails"]["duration"])
-			})
-		return results
+	async def playList(self, list_id : str) -> List[JSON]:
+		return await get(
+			self.__PlaylistSearchUrl % (list_id),
+			Parser('playlist')
+		)
 
-	async def songList(self, query : str, size : int = 12):
-		async with ClientSession() as session:
-			songData = json.loads(await self.__fetch(self.__head + self.__Search.format(query, self.__api_key) + self.__max.format(size), session))
-		return await self.__video([item["id"]["videoId"] for item in songData["items"]])
+	async def spotifyPlayList(self, list_id : str) -> List[JSON]:
+		return await spotifyGet(
+			'/playlist/%s' % (list_id),
+			Parser('spotifyList')
+		)
 
-	async def searchList(self, listId : str):
-		async with ClientSession() as session:
-			listData = await self.__fetch(self.__head + self.__PlayList.format(listId, self.__api_key) + self.__max.format(40), session)
-			listData = json.loads(listData)
-		return ["https://youtu.be/" + item["contentDetails"]["videoId"] for item in listData["items"]]
+	async def resultsList(self, querys : List[str]) -> List[List[JSON]]:
+		return [(await self.resultList(q)) for q in querys]
 
-	async def songs(self, querys : List[str]):
-		async with ClientSession() as session:
-			searchList = [asyncio.create_task(self.__fetch(self.__head + self.__Search.format(query, self.__api_key) + self.__max.format(12), session)) for query in querys]
-			data = await asyncio.gather(*searchList)
-			data = [await self.__video(Ids) for Ids in [list(map(lambda x: x["id"]["videoId"], items)) for items in [json.loads(S)["items"] for S in data]]]
-			return data
+	async def spotifyResultsList(self, querys : List[str]) -> List[List[JSON]]:
+		return [(await self.spotifyResultList(q)) for q in querys]
 
-	async def info(self, url : str):
+	async def next(self, id : str) -> JSON:
+		return await get(
+			self.__NextSearchUrl % (id),
+			Parser('video')
+		)
+
+	async def spotifyTrack(self, id : str) -> JSON:
+		return await spotifyGet(
+			'https://open.spotify.com/track/%s' % (id),
+			Parser('spotifyTrack')
+		)
+
+	async def info(self, url : str) -> Union[YoutubeVideos, YoutubeVideo, SpotifyMusic, SpotifyMusics]:
 		try:
-			return Song(url)
-		except TypeError:
-			return SongList(url)
+			return YoutubeVideo(url)
+		except YoutubeUrlError:
+			return YoutubeVideos(url)
+		except YoutubeTypeError:
+			return SpotifyMusic(url)
+		except SpotifyUrlError:
+			return SpotifyMusics(url)
 		except:
-			raise UnKnownError("not a correct url.")
+			raise UnKnownError('\'%s\' is not a correct url' \
+			% url)
