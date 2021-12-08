@@ -5,6 +5,7 @@ from typing import (
 	List,
 	Union
 )
+from pprint import pprint
 
 __all__ = (
 	'Parser'
@@ -74,12 +75,10 @@ class Parser:
 	def loadSpotify(self, data : JSON) -> None:
 		if 'album' in data:
 			result = data
-			del result['artists'], result['available_markets']
 		elif type(data) is list:
 			result = []
 			for idx in range(len(data)):
 				t = data[idx]
-				print(t)
 				if 'album' not in t and 'artists' in t:
 					t['album'] = t
 				if 'track' not in t and 'album' in t:
@@ -102,7 +101,7 @@ class Parser:
 											['itemSectionRenderer'] \
 											['contents']:
 			
-			if 'videoRenderer' not in result:
+			if result.get('videoRenderer') is None:
 				continue
 			obj : dict = result['videoRenderer']
 
@@ -111,7 +110,8 @@ class Parser:
 				'title': obj['title']['runs'][0]['text'],
 				'thumbnail': obj['thumbnail']['thumbnails'],
 				'length': obj['lengthText']['simpleText'] \
-					if 'lengthText' in obj else 'STREAMING'
+					if 'lengthText' in obj else 'STREAMING',
+				'author': obj['shortBylineText']['runs'][0]['text']
 			})
 
 	def videoCut(self) -> None:
@@ -132,7 +132,8 @@ class Parser:
 			'title': obj['title']['simpleText'],
 			'thumbnail': obj['thumbnail']['thumbnails'],
 			'length': obj['lengthText']['simpleText'] \
-				if 'lengthText' in obj else 'STREAMING'
+				if 'lengthText' in obj else 'STREAMING',
+			'author': obj['shortBylineText']['runs'][0]['text']
 		})
 
 	def playlistCut(self) -> None:
@@ -152,6 +153,8 @@ class Parser:
 											['playlistVideoListRenderer'] \
 											['contents']:
 			
+			if result.get('playlistVideoRenderer') is None:
+				continue
 			obj : dict = result['playlistVideoRenderer']
 
 			self.result.append({
@@ -159,7 +162,8 @@ class Parser:
 				'title': obj['title']['runs'][0]['text'],
 				'thumbnail': obj['thumbnail']['thumbnails'],
 				'length': obj['lengthText']['simpleText'] \
-					if 'lengthText' in obj else 'STREAMING'
+					if 'lengthText' in obj else 'STREAMING',
+				'author': obj['shortBylineText']['runs'][0]['text']
 			})
 
 	def spotifyAlbumCut(self) -> None:
@@ -167,13 +171,15 @@ class Parser:
 			raise Exception('data is not load')
 
 		tracks = self.scriptData
+		print(tracks[0])
 		for track in tracks:
 			duration = track['duration_ms'] // 1000
 			self.result.append({
 				'id': track['id'],
 				'title': track['name'],
 				'thumbnail': [] or track['album']['images'],
-				'length': dp(duration)
+				'length': dp(duration),
+				'author': [] or track['artists']
 			})
 
 	def spotifyTrackCut(self) -> None:
@@ -186,7 +192,8 @@ class Parser:
 			'id': track['id'],
 			'title': track['name'],
 			'thumbnail': track['album']['images'],
-			'length': dp(duration)
+			'length': dp(duration),
+			'author': [] or track['artists']
 		})
 
 	def spotifyPlaylistCut(self) -> None:
@@ -200,5 +207,6 @@ class Parser:
 				'id': track['id'],
 				'title': track['name'],
 				'thumbnail': track['album']['images'],
-				'length': dp(duration)
+				'length': dp(duration),
+				'author': [] or track['artists']
 			})

@@ -1,4 +1,5 @@
-from NPytdl import (Pytdl,
+from NPytdl import (
+	Pytdl,
 	SpotifyMusics,
 	SpotifyMusic,
 	YoutubeVideos,
@@ -11,13 +12,12 @@ import os
 
 ydl = Pytdl()
 loop = asyncio.get_event_loop()
+l = YoutubeVideos('https://www.youtube.com/playlist?list=PLZsoTGvbP97Zr85bcC_IM1fyLpqJtmu1q')
 
 print(loop.run_until_complete(
-	spotifyGet(
-		'ANIMA',
-		Parser('spotifyAlbum')
-	)
+	l.create()
 ))
+# print(l.videoList)
 
 # print("歡迎使用Pytdl。")
 

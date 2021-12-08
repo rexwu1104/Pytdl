@@ -154,7 +154,7 @@ class YoutubeVideos:
 
 	async def create(self) -> None:
 		self.ytdl : Pytdl = Pytdl()
-		yl = await self.ytdl.PlayList(self.__url.split('=')[0])
+		yl = await self.ytdl.playList(self.__url.split('=')[1])
 
 		self.videoList = []
 		for y in yl:
