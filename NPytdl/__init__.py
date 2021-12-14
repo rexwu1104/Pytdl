@@ -83,7 +83,7 @@ def dp(d : int) -> str:
 def ld(l: str):
 	ll = l.split(':')
 	s: int = 0
-	for idx in range(len(ll)-1, -1):
+	for idx in range(0, len(ll)):
 		s += s * 60 + int(ll[idx])
 
 	return dp(s)
