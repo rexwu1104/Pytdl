@@ -80,6 +80,14 @@ def dp(d : int) -> str:
 
 	return result
 
+def ld(l: str):
+	ll = l.split(':')
+	s: int = 0
+	for idx in range(len(ll)-1, -1):
+		s += s * 60 + int(ll[idx])
+
+	return dp(s)
+
 class UnKnownError(Exception):
 	...
 
@@ -126,19 +134,19 @@ class SpotifyMusics:
 		elif not getId(url, sl)[1]:
 			raise SpotifyUrlError('%s is not a spotify list url' % (url))
 
-		self.__url = url
+		self.url = url
 		self.__type = url.split('/')[3]
 
 	async def create(self) -> None:
 		self.ytdl : Pytdl = Pytdl()
 		if self.__type == 'album':
-			sl = await self.ytdl.spotifyResultList(self.__url)
+			sl = await self.ytdl.spotifyResultList(self.url)
 		else:
-			sl = await self.ytdl.spotifyPlayList(self.__url)
+			sl = await self.ytdl.spotifyPlayList(self.url.split('/')[4])
 
 		self.musicList = []
 		for s in sl:
-			data = (await self.resultList(s['title']))[0]
+			data = (await self.resultList(s['title']+'-'+s['author']))[0]
 			self.musicList.append(
 				YoutubeVideo('https://www.youtube.com/watch?v=' + data['id'], data)
 			)
@@ -150,11 +158,11 @@ class YoutubeVideos:
 		elif not getId(url, yl)[1]:
 			raise YoutubeUrlError('%s is not a youtube list url' % (url))
 
-		self.__url = url
+		self.url = url
 
 	async def create(self) -> None:
 		self.ytdl : Pytdl = Pytdl()
-		yl = await self.ytdl.playList(self.__url.split('=')[1])
+		yl = await self.ytdl.playList(self.url.split('=')[1])
 
 		self.videoList = []
 		for y in yl:
@@ -169,13 +177,13 @@ class SpotifyMusic:
 		elif not getId(url, s)[1]:
 			raise YoutubeUrlError('%s is not a youtube list url' % (url))
 
-		self.__url = url
+		self.url = url
 
 	async def create(self) -> None:
 		self.ytdl : Pytdl = Pytdl()
-		s = (await self.ytdl.spotifyTrack(self.__url.split('/')[4]))[0]
+		s = (await self.ytdl.spotifyTrack(self.url.split('/')[4]))[0]
 
-		y = (await self.ytdl.resultList(s['title']))[0]
+		y = (await self.ytdl.resultList(s['title']+'-'+s['author']))[0]
 		self.music = YoutubeVideo(
 			'http://www.youtube.com/watch?v=' + y['id'],
 			y
@@ -188,7 +196,7 @@ class YoutubeVideo:
 		elif not  getId(url, y)[1]:
 			raise YoutubeUrlError('%s is not a youtube list url' % (url))
 
-		self.__url = url
+		self.url = url
 		self.__data = data
 
 	async def create(self) -> None:
@@ -204,18 +212,20 @@ class YoutubeVideo:
 
 		data = self.__data
 		with ydl.YoutubeDL(self.opt) as dl:
-			info = dl.extract_info(self.__url, download=False)
+			info = dl.extract_info(self.url, download=False)
 
 		if len(data) != 0:
 			self.id = data['id']
 			self.title = data['title']
-			self.duration = data['length']
+			self.duration = ld(data['length'])
 			self.thumbnail = data['thumbnail']
+			self.author = data['author']
 		else:
 			self.id = info['id']
 			self.title = info['title']
 			self.duration = dp(info['duration'])
 			self.thumbnail = info['thumbnail']
+			self.author = info['uploader']
 		self.video_url = info['webpage_url']
 		self.voice_url = info['url']
 		self.stream = Stream(info['webpage_url'])
@@ -266,7 +276,7 @@ class Pytdl:
 
 	async def spotifyTrack(self, id : str) -> JSON:
 		return await spotifyGet(
-			'https://open.spotify.com/track/%s' % (id),
+			'/track/%s' % (id),
 			Parser('spotifyTrack')
 		)
 

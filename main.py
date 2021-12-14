@@ -10,13 +10,14 @@ from NPytdl.dataParser import Parser
 import asyncio
 import os
 
+
 ydl = Pytdl()
 loop = asyncio.get_event_loop()
-l = YoutubeVideos('https://www.youtube.com/playlist?list=PLZsoTGvbP97Zr85bcC_IM1fyLpqJtmu1q')
+l = YoutubeVideo('https://www.youtube.com/watch?v=40dJS_LC6S8')
 
-print(loop.run_until_complete(
+a = loop.run_until_complete(
 	l.create()
-))
+)
 # print(l.videoList)
 
 # print("歡迎使用Pytdl。")

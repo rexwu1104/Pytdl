@@ -5,7 +5,6 @@ from typing import (
 	List,
 	Union
 )
-from pprint import pprint
 
 __all__ = (
 	'Parser'
@@ -171,7 +170,6 @@ class Parser:
 			raise Exception('data is not load')
 
 		tracks = self.scriptData
-		print(tracks[0])
 		for track in tracks:
 			duration = track['duration_ms'] // 1000
 			self.result.append({

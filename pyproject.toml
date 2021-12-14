@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pytdl"
-version = "0.1.0"
+version = "4.0.4"
 description = ""
 authors = ["repl.it user <replituser@example.com>"]
 
