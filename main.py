@@ -3,9 +3,10 @@ from NPytdl import (
 	SpotifyMusics,
 	SpotifyMusic,
 	YoutubeVideos,
-	YoutubeVideo
+	YoutubeVideo,
+	getId, sl, yl, y, s
 )
-from NPytdl.webBug import get, spotifyGet
+from NPytdl.crawler import get, spotifyGet
 from NPytdl.dataParser import Parser
 import asyncio
 import os
@@ -13,11 +14,17 @@ import os
 
 ydl = Pytdl()
 loop = asyncio.get_event_loop()
-l = YoutubeVideo('https://www.youtube.com/watch?v=40dJS_LC6S8')
+# l = YoutubeVideo('https://www.youtube.com/watch?v=40dJS_LC6S8')
 
 a = loop.run_until_complete(
-	l.create()
+	ydl.info('https://www.youtube.com/watch?v=FjrY2GSithw')
 )
+loop.run_until_complete(a.create())
+a.stream.download()
+# print(getId('https://open.spotify.com/playlist/2WIdfUdsWOdAABeqddVFN2?si=07650158e9f04061', sl))
+# print(getId('https://open.spotify.com/playlist/2WIdfUdsWOdAABeqddVFN2?si=07650158e9f04061', yl))
+# print(getId('https://open.spotify.com/playlist/2WIdfUdsWOdAABeqddVFN2?si=07650158e9f04061', s))
+# print(getId('https://open.spotify.com/playlist/2WIdfUdsWOdAABeqddVFN2?si=07650158e9f04061', y))
 # print(l.videoList)
 
 # print("歡迎使用Pytdl。")

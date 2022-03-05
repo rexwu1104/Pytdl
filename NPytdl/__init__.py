@@ -22,13 +22,13 @@ __all__ = (
 
 JSON = Dict[str, Union[str, List, Dict]]
 
-from .webBug import get, spotifyGet
+from .crawler import get, spotifyGet
 from .dataParser import Parser
 
-sl = re.compile(r'(?:https?://)?open\.spotify\.com/(album|playlist)/([\w\-]+)(?:[?&].+)*')
-yl = re.compile(r'(?:https?://)?(?:youtu\.be/|www\.youtube\.com/playlist\?(?:.+&)*list=)([\w\-]+)(?:[?&].+)*')
-s = re.compile(r'(?:https?://)?open\.spotify\.com/track/([\w\-]+)(?:[?&].+)*')
-y = re.compile(r'(?:https?://)?(?:youtu\.be/|www\.youtube\.com/watch\?(?:.+&)*v=)([\w\-]+)(?:[?&].+)*')
+sl = re.compile(r'(?:https?://)?open\.spotify\.com/(album|playlist)/([\w\-]+)(?:[\?\&].+)*')
+yl = re.compile(r'(?:https?://)?(?:youtu\.be/|(?:www\.)*youtube\.com/playlist\?(?:.+&)*list=)([\w\-]+)(?:[\?\&].+)*')
+s = re.compile(r'(?:https?://)?open\.spotify\.com/track/([\w\-]+)(?:[\?\&].+)*')
+y = re.compile(r'(?:https?://)?(?:youtu\.be/|(?:www\.)*youtube\.com/watch\?(?:.+&)*v=)([\w\-]+)(?:[\?\&].+)*')
 
 def getId(string, regex):
 	matchs = regex.search(string)
@@ -112,9 +112,12 @@ class Stream:
 	def __init__(self, url : str):
 		self.__url = url
 
-	def download(self, path : str = './'):
+	def download(self, cookie_file : str = None, file_type : str = 'audio', path : str = './'):
+		'''
+		file_type must be 'audio' or 'video'
+		'''
 		self.opt = {
-			'format': 'bestaudio/best',
+			'format': f'best{file_type}/best',
 			'postprocessors': [{
 				'key': 'FFmpegExtractAudio',
 				'preferredcodec': 'mp3',
@@ -123,9 +126,12 @@ class Stream:
 			'logger': Logger(),
 			'outtmpl': path if path != "./" else "./%(id)s.mp3"
 		}
+
+		if cookie_file is not None:
+			self.opt['cookiefile'] = cookie_file
 		
 		with ydl.YoutubeDL(self.opt) as dl:
-			dl.extract_info(self.__url, download=True)
+			dl.download([self.__url])
 
 class SpotifyMusics:
 	def __init__(self, url : str):
@@ -146,7 +152,7 @@ class SpotifyMusics:
 
 		self.musicList = []
 		for s in sl:
-			data = (await self.resultList(s['title']+'-'+s['author']))[0]
+			data = (await self.ytdl.resultList(s['title']+'-'+('' or s['author'][0])))[0]
 			self.musicList.append(
 				YoutubeVideo('https://www.youtube.com/watch?v=' + data['id'], data)
 			)
@@ -173,9 +179,9 @@ class YoutubeVideos:
 class SpotifyMusic:
 	def __init__(self, url : str):
 		if not (getId(url, sl)[1] or getId(url, s)[1]):
-			raise YoutubeTypeError('%s is not a youtube url' % (url))
+			raise SpotifyTypeError('%s is not a spotify url' % (url))
 		elif not getId(url, s)[1]:
-			raise YoutubeUrlError('%s is not a youtube list url' % (url))
+			raise SpotifyUrlError('%s is not a spotify list url' % (url))
 
 		self.url = url
 
@@ -193,13 +199,13 @@ class YoutubeVideo:
 	def __init__(self, url : str, data : JSON = {}):
 		if not (getId(url, yl)[1] or getId(url, y)[1]):
 			raise YoutubeTypeError('%s is not a youtube url' % (url))
-		elif not  getId(url, y)[1]:
-			raise YoutubeUrlError('%s is not a youtube list url' % (url))
+		elif not getId(url, y)[1]:
+			raise YoutubeUrlError('%s is not a youtube video url' % (url))
 
 		self.url = url
 		self.__data = data
 
-	async def create(self) -> None:
+	async def create(self, cookie_file : str = None) -> None:
 		self.opt = {
 			'format': 'bestaudio/best',
 			'postprocessors': [{
@@ -209,6 +215,9 @@ class YoutubeVideo:
 			}],
 			'logger': Logger()
 		}
+
+		if cookie_file is not None:
+			self.opt['cookiefile'] = cookie_file
 
 		data = self.__data
 		with ydl.YoutubeDL(self.opt) as dl:
@@ -259,7 +268,7 @@ class Pytdl:
 	async def spotifyPlayList(self, list_id : str) -> List[JSON]:
 		return await spotifyGet(
 			'/playlist/%s' % (list_id),
-			Parser('spotifyList')
+			Parser('spotifyPlaylist')
 		)
 
 	async def resultsList(self, querys : List[str]) -> List[List[JSON]]:
@@ -286,9 +295,10 @@ class Pytdl:
 		except YoutubeUrlError:
 			return YoutubeVideos(url)
 		except YoutubeTypeError:
-			return SpotifyMusic(url)
-		except SpotifyUrlError:
-			return SpotifyMusics(url)
-		except:
-			raise UnKnownError('\'%s\' is not a correct url' \
-			% url)
+			try:
+				return SpotifyMusic(url)
+			except SpotifyUrlError:
+				return SpotifyMusics(url)
+			except:
+				raise UnKnownError('\'%s\' is not a correct url' \
+						% url)

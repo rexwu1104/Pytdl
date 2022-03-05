@@ -177,7 +177,7 @@ class Parser:
 				'title': track['name'],
 				'thumbnail': [] or track['album']['images'],
 				'length': dp(duration),
-				'author': [] or track['artists']
+				'author': [] or list(map(lambda v: v['name'], track['artists']))
 			})
 
 	def spotifyTrackCut(self) -> None:
@@ -191,7 +191,7 @@ class Parser:
 			'title': track['name'],
 			'thumbnail': track['album']['images'],
 			'length': dp(duration),
-			'author': [] or track['artists']
+			'author': [] or list(map(lambda v: v['name'], track['artists']))
 		})
 
 	def spotifyPlaylistCut(self) -> None:
@@ -206,5 +206,5 @@ class Parser:
 				'title': track['name'],
 				'thumbnail': track['album']['images'],
 				'length': dp(duration),
-				'author': [] or track['artists']
+				'author': [] or list(map(lambda v: v['name'], track['artists']))
 			})
